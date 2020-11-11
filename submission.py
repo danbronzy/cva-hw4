@@ -95,7 +95,7 @@ def triangulate(C1, pts1, C2, pts2):
         pt2Stack = np.hstack((pt2,pt2,pt2,pt2)).T
         A2 = np.cross(pt2Stack, C2.T).T[:2,:]
 
-        A = np.vstack((A1, A2))
+        A = np.vstack((A1, A2)) 
         #calculate least squares solutions
         _, _, vh = np.linalg.svd(A)
 
@@ -119,6 +119,10 @@ def triangulate(C1, pts1, C2, pts2):
     return P, err
 
 
+def getWindowMag(im, x, y, wr):
+    window = im[y - wr:y + wr, x - wr:x + wr, :] 
+    window = np.sum(window, axis = 2)/3
+    return window
 '''
 Q4.1: 3D visualization of the temple images.
     Input:  im1, the first image
@@ -131,9 +135,70 @@ Q4.1: 3D visualization of the temple images.
 
 '''
 def epipolarCorrespondence(im1, im2, F, x1, y1):
-    # Replace pass by your implementation
-    pass
+    #window radius
+    wr = 10
 
+    #guassian weighting
+    x, y = np.meshgrid(np.linspace(-1,1,2*wr), np.linspace(-1,1,2*wr)) 
+    dst = np.sqrt(x*x+y*y) 
+    
+    # Intializing sigma and muu 
+    sigma = .7
+    muu = 0.000
+    
+    # Calculating Gaussian array 
+    # gauss = np.exp(-( (dst-muu)**2 / ( 2.0 * sigma**2 ) ) ) 
+    gauss = np.ones((20,20))
+    #extents
+    yMax, xMax, _ = im2.shape
+
+    #grab window from im1
+    window1 = getWindowMag(im1, x1, y1, wr)
+
+    #homogenous coordinate
+    xc = np.array([x1, y1, 1])
+
+    #epipolar line
+    l = F @ xc
+    a, b, c = l
+
+    #only searching within a certain radius of the original point
+    searchRad = 50
+    testPoints = 10000
+    if a != 0:
+        #vertical line, use y to iterate
+        yVals = np.array(np.linspace(wr, yMax - wr, testPoints)).reshape((testPoints, 1))
+        xVals = (-(b * yVals + c) / a).reshape((testPoints, 1))
+
+        dists = np.linalg.norm(np.hstack((xVals - x1, yVals - y1)), axis = 1)  
+
+        testableXs = xVals[np.where(dists < searchRad)].astype(int)
+        testableYs = yVals[np.where(dists < searchRad)].astype(int)
+    else:
+        #not vertical line, we can iterate over x
+        xVals = np.array(np.arange(wr, xMax - wr, testPoints)).reshape((testPoints, 1))
+        yVals = (-(a*xVals + c) / b).astype(int).reshape((testPoints, 1))
+
+        dists = np.linalg.norm(np.hstack((xVals - x1, yVals - y1)), axis = 1)  
+
+        testableXs = xVals[np.where(dists < searchRad)].astype(int)
+        testableYs = yVals[np.where(dists < searchRad)].astype(int)
+
+    imDists = np.zeros(testableXs.shape)
+    pixDists = np.zeros(testableXs.shape)
+    for ind in range(len(testableXs)):
+        x2 = int(testableXs[ind])
+        y2 = int(testableYs[ind])
+        window2 = getWindowMag(im2, x2, y2, wr)
+
+        imDists[ind] = np.linalg.norm(np.multiply(window1 - window2, gauss))
+        pixDists[ind] = np.linalg.norm([x2 - x1, y2-y1])
+    
+    #minimum difference between target. Might not be close to the actual pixel
+    minImDistInd = np.argmin(imDists)
+
+    return int(testableXs[minImDistInd]), int(testableYs[minImDistInd])
+    
 '''
 Q5.1: Extra Credit RANSAC method.
     Input:  pts1, Nx2 Matrix

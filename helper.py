@@ -146,10 +146,16 @@ def epipolarMatchGUI(I1, I2, F):
     ax2.imshow(I2)
     ax2.set_title('Verify that the corresponding point \n is on the epipolar line in this image')
     ax2.set_axis_off()
-
-    while True:
+    pts1 = np.zeros((0,2))
+    pts2 = np.zeros((0,2))
+    while plt.get_fignums():
+        # if (pts1.shape[0] >= 10):
+        #     plt.savefig("../results/q4_1.png")
+        #     return pts1, pts2
         plt.sca(ax1)
         x, y = plt.ginput(1, mouse_stop=2)[0]
+
+        pts1 = np.vstack((pts1, [x, y]))
 
         xc = int(x)
         yc = int(y)
@@ -160,7 +166,7 @@ def epipolarMatchGUI(I1, I2, F):
         if s==0:
             print('Zero line vector in displayEpipolar')
 
-        l = l/s;
+        l = l/s
 
         if l[0] != 0:
             ye = sy-1
@@ -179,5 +185,8 @@ def epipolarMatchGUI(I1, I2, F):
 
         # draw points
         x2, y2 = sub.epipolarCorrespondence(I1, I2, F, xc, yc)
+
+        pts2 = np.vstack((pts2, [x2, y2]))
+
         ax2.plot(x2, y2, 'ro', MarkerSize=8, linewidth=2)
         plt.draw()
